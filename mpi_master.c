@@ -339,6 +339,7 @@ int main(int argc, char *argv[]) {
     
     // First row is always the same so hardcode it into workers
     generate_row(rank, w, xmin, ymin, xinc, yinc, prof, row);
+    MPI_Send(row, w, MPI_UNSIGNED_CHAR, p-1, 0, MPI_COMM_WORLD);
 
     while (1) {
       int row_index;
