@@ -284,8 +284,9 @@ int main(int argc, char *argv[]) {
   fprintf( stderr, "Image sizes: %dx%d\n", w, h);
   
   if (rank == p-1) {
-    // Master = p-1
+    // Master
 
+    // Output image
     unsigned char *mandel = malloc(w*h*sizeof(unsigned char));
 
     if(mandel == NULL) {
@@ -295,6 +296,7 @@ int main(int argc, char *argv[]) {
     int worker_row[p-1];
     int next_row = 0;
     
+    // Initial row assignment
     for (int worker_ind = 0; worker_ind < p-1; worker_ind++) {
       MPI_Send(&next_row, 1, MPI_INT, worker_ind, 0, MPI_COMM_WORLD);
       worker_row[worker_ind] = next_row;
@@ -302,18 +304,17 @@ int main(int argc, char *argv[]) {
     }
     
     int running_procceses = p-1;
-
     while (running_procceses > 0) {
+      
       // MPI_probe
       MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,  &status);
       int sender = status.MPI_SOURCE;
-
       int receiving_row = worker_row[sender];
 
       // MPI_receive
       MPI_Recv(&mandel[w * receiving_row], w, MPI_UNSIGNED_CHAR, sender, 0, MPI_COMM_WORLD, &status);
 
-      // MPI_send next row
+      // MPI_send next_row
       if (next_row < h) {
         MPI_Send(&next_row, 1, MPI_INT, sender, 0, MPI_COMM_WORLD);
         worker_row[sender] = next_row;
@@ -328,11 +329,14 @@ int main(int argc, char *argv[]) {
 
     }
 
+    // Save output image
     save_rasterfile( "mandel.ras", w, h, mandel);
     free(mandel);
 
   } else {
     // Workers
+
+    // Row worker is calculating
     unsigned char *row = malloc( w*sizeof(unsigned char));
 
     if (row == NULL) {
@@ -342,18 +346,22 @@ int main(int argc, char *argv[]) {
     while (1) {
       int row_index;
 
+      // Receive row index from master
       MPI_Recv(&row_index, 1, MPI_INT, p-1, 0, MPI_COMM_WORLD, &status);
 
-      // If -1 then no more rows
+      // If row_index = -1 then there are no more rows
       if (row_index == -1){
         fprintf( stderr, "Process: %d, stopping\n", rank);
         break;
       }
 
+      // Else generate the row
       generate_row(row_index, w, xmin, ymin, xinc, yinc, prof, row);
 
+      // Send computed row to master
       MPI_Send(row, w, MPI_UNSIGNED_CHAR, p-1, 0, MPI_COMM_WORLD);
     }    
+    
     free(row);
   }
   
