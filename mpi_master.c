@@ -320,6 +320,8 @@ int main(int argc, char *argv[]) {
         int stop = -1;
         MPI_Send(&stop, 1, MPI_INT, sender, 0, MPI_COMM_WORLD);
         running_procceses--;
+
+        fprintf( stderr, "Stoping process: %d, %d processes remaining\n", sender, running_procceses);
       }
 
     }
@@ -344,7 +346,10 @@ int main(int argc, char *argv[]) {
       MPI_Recv(&row_index, 1, MPI_INT, p-1, 0, MPI_COMM_WORLD, &status);
 
       // If -1 then no more rows
-      if (row_index == -1) break;
+      if (row_index == -1){
+        fprintf( stderr, "Process: %d, stopping\n", rank);
+        break;
+      }
 
       generate_row(row_index, w, xmin, ymin, xinc, yinc, prof, row);
 
