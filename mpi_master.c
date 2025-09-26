@@ -361,7 +361,7 @@ int main(int argc, char *argv[]) {
   
   /* Timing stop */
   fin = my_gettimeofday();
-  fprintf( stderr, "Total computation time: %g sec\n", fin - debut);
+  fprintf( stderr, "Total computation time for process %d: %g sec\n", rank, fin - debut);
   fprintf( stdout, "%g\n", fin - debut);
 
   MPI_Finalize();
