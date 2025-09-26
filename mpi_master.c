@@ -324,6 +324,9 @@ int main(int argc, char *argv[]) {
 
     }
 
+    save_rasterfile( "mandel.ras", w, h, mandel);
+    free(mandel);
+
   } else {
     // Workers
     unsigned char *row = malloc( w*sizeof(unsigned char));
@@ -335,7 +338,7 @@ int main(int argc, char *argv[]) {
     // First row is always the same so hardcode it into workers
     generate_row(rank, w, xmin, ymin, xinc, yinc, prof, row);
 
-    while (true) {
+    while (1) {
       int row_index;
 
       MPI_Recv(&row_index, 1, MPI_INT, p-1, 0, MPI_COMM_WORLD, &status);
@@ -347,20 +350,13 @@ int main(int argc, char *argv[]) {
 
       MPI_Send(row, w, MPI_UNSIGNED_CHAR, p-1, 0, MPI_COMM_WORLD);
     }    
+    free(row);
   }
   
   /* Timing stop */
   fin = my_gettimeofday();
   fprintf( stderr, "Total computation time: %g sec\n", fin - debut);
   fprintf( stdout, "%g\n", fin - debut);
-
-  if (rank == p-1) {
-    /* Saving the grid in the "mandel.ras" result file */
-    save_rasterfile( "mandel.ras", w, h, mandel);
-    free(mandel);
-  } else {
-    free(row);
-  }
 
   MPI_Finalize();
   return 0;
