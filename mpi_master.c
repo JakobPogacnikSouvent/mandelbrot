@@ -292,15 +292,17 @@ int main(int argc, char *argv[]) {
       fprintf( stderr, "Array memory allocation error \n");
     }
 
-    // Process p1 is working on row worker_row[p1]
     int worker_row[p-1];
-
+    int next_row = 0;
+    
     for (int worker_ind = 0; worker_ind < p-1; worker_ind++) {
-      worker_row[worker_ind] = worker_ind;
+      MPI_Send(&next_row, 1, MPI_INT, worker_ind, 0, MPI_COMM_WORLD);
+      worker_row[worker_ind] = next_row;
+      next_row++;
     }
-
-    int next_row = p-1;
+    
     int running_procceses = p-1;
+
     while (running_procceses > 0) {
       // MPI_probe
       MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,  &status);
@@ -336,10 +338,6 @@ int main(int argc, char *argv[]) {
     if (row == NULL) {
         fprintf(stderr, "Memory allocation error \n");
     }
-    
-    // First row is always the same so hardcode it into workers
-    generate_row(rank, w, xmin, ymin, xinc, yinc, prof, row);
-    MPI_Send(row, w, MPI_UNSIGNED_CHAR, p-1, 0, MPI_COMM_WORLD);
 
     while (1) {
       int row_index;
