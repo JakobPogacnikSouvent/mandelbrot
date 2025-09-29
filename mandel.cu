@@ -238,8 +238,6 @@ int main(int argc, char *argv[]) {
   int prof;
   /* Resulting image */
   unsigned char	*ima;
-  /* Intermediate variables */
-  double x, y;
   /* Timing: */
   double debut, fin;
 
@@ -264,8 +262,8 @@ int main(int argc, char *argv[]) {
   if( argc > 6) ymax = atof(argv[6]);
   if( argc > 7) prof = atoi(argv[7]);
   
-  double xinc = (xmax - xmin) / (w-1);
-  double yinc = (ymax - ymin) / (h-1);
+  xinc = (xmax - xmin) / (w-1);
+  yinc = (ymax - ymin) / (h-1);
 
   /* Parameter display */
   fprintf( stderr, "Domain: {[%lg,%lg]x[%lg,%lg]}\n", xmin, ymin, xmax, ymax);
