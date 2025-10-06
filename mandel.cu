@@ -354,12 +354,11 @@ int main(int argc, char *argv[]) {
   cudaMemcpy(ima, d_ima, w*h*sizeof(unsigned char), cudaMemcpyDeviceToHost);
   cudaFree(d_ima);
 
-  long long sum = blockSum(d_steps, w*h);
+  long long sum = blockSum(d_steps, w*h); //blockSum mutates d_steps
   cudaFree(d_steps);
 
   double average = sum / (w * h);
   printf("Average iteration count: %.2f\n", average);
-  free(steps);
   
   /* Timing stop */
   fin = my_gettimeofday();
