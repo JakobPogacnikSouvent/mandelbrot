@@ -209,7 +209,7 @@ __device__ unsigned char xy2color(double a, double b, int prof, int *n_steps) {
 }
 
 
-__global__ void mandelbrotKernel(unsigned char *d_ima, unsigned int *d_steps, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
+__global__ void mandelbrotKernel(unsigned char *d_ima, int *d_steps, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
   double xinc = (xmax - xmin) / (w-1);
   double yinc = (ymax - ymin) / (h-1);
 
@@ -318,8 +318,6 @@ int main(int argc, char *argv[]) {
   fin = my_gettimeofday();
   fprintf( stderr, "Total computation time: %g sec\n", fin - debut);
   fprintf( stdout, "%g\n", fin - debut);
-
-  for (i)
 
   /* Saving the grid in the "mandel.ras" result file */
   save_rasterfile( "mandel.ras", w, h, ima);
