@@ -209,7 +209,7 @@ __device__ unsigned char xy2color(double a, double b, int prof, int *n_steps) {
 }
 
 
-__global__ void mandelbrotKernel(unsigned char *d_ima, int *d_steps, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
+__global__ void mandelbrotKernel(unsigned char *d_ima, long long *d_steps, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
   double xinc = (xmax - xmin) / (w-1);
   double yinc = (ymax - ymin) / (h-1);
 
@@ -224,9 +224,62 @@ __global__ void mandelbrotKernel(unsigned char *d_ima, int *d_steps, int w, int 
   int n_steps = 0;
   d_ima[col+row*w] = xy2color(x, y, prof, &n_steps);
 
-  d_steps[col+row*w] = n_steps;
+  d_steps[col+row*w] = (long long) n_steps;
 }
 
+__global__ void blockReduction(long long *d_input, long long *d_output, int N) {
+  // N = size of d_input
+  extern __shared__ long long sdata[];
+  unsigned int tid = threadIdx.x;
+  unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  sdata[tid] = (i < N) ? d_input[i] : 0;
+  __syncthreads();
+
+  for (unsigned int s = 1; s < blockDim.x; s *= 2) {
+    unsigned int index = 2 * s * tid;  
+    if (index < blockDim.x) {
+      sdata[index] += sdata[index + s];
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) d_output[blockIdx.x] = sdata[0];
+}
+
+long long blockSum(long long *d_input, int N) {
+  int block_size = 16 * 16;
+  int num_blocks = (N + block_size - 1) / block_size;
+
+  long long *d_output;
+  cudaMalloc(&d_output, num_blocks * sizeof(long long));
+
+  long long *d_in = d_input;
+  int n = N;
+
+  while (true) {
+      // Launch kernel
+      blockReduction<<<num_blocks, block_size, block_size * sizeof(long long)>>>(d_in, d_output, n);
+
+      // If we reduced to a single value, break
+      if (num_blocks == 1) break;
+
+      // Prepare for next iteration
+      n = num_blocks;
+      num_blocks = (n + block_size - 1) / block_size;
+
+      // Swap pointers: output becomes input for next reduction
+      d_in = d_output;
+  }
+
+  // Copy the final result back to host
+  long long result;
+  cudaMemcpy(&result, d_output, sizeof(long long), cudaMemcpyDeviceToHost);
+
+  cudaFree(d_output);
+
+  return result;
+}
 
 /* 
  * Main part: for each grid point, run xy2color()
@@ -294,21 +347,15 @@ int main(int argc, char *argv[]) {
   unsigned char *d_ima;
   cudaMalloc(&d_ima, w*h*sizeof(unsigned char));
 
-  int *steps = (int *)malloc( w*h*sizeof(int));
-  int *d_steps;
-  cudaMalloc(&d_steps, w*h*sizeof(int));
+  long long *d_steps;
+  cudaMalloc(&d_steps, w*h*sizeof(long long));
 
   mandelbrotKernel<<<gridSize, threadsPerBlock>>>(d_ima, d_steps, w, h, prof, xmin, ymin, xmax, ymax);
   cudaMemcpy(ima, d_ima, w*h*sizeof(unsigned char), cudaMemcpyDeviceToHost);
   cudaFree(d_ima);
 
-  cudaMemcpy(steps, d_steps, w*h*sizeof(int), cudaMemcpyDeviceToHost);
+  long long sum = blockSum(d_steps, w*h);
   cudaFree(d_steps);
-
-  long long sum = 0;
-  for (int i = 0; i < w * h; i++) {
-      sum += steps[i];
-  }
 
   double average = sum / (w * h);
   printf("Average iteration count: %.2f\n", average);
