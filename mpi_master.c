@@ -221,7 +221,7 @@ void generate_row(int k, int w, double xmin, double ymin, double xinc, double yi
 
         int pixel_iterations = 0;
         row[j] = xy2color(x, y, prof, &pixel_iterations);
-        &n_iterations += pixel_iterations;
+        *n_iterations += pixel_iterations;
     }
 }
 
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
     save_rasterfile( "mandel.ras", w, h, mandel);
     free(mandel);
     
-    long long *pixel_iterations = malloc((p-1) * sizeof(long long))
+    long long *pixel_iterations = malloc((p-1) * sizeof(long long));
     for (int i = 0; i < p-1; i++) {
       MPI_Probe(MPI_ANY_SOURCE, 1, MPI_COMM_WORLD,  &status);
       int sender = status.MPI_SOURCE;
