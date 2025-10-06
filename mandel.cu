@@ -188,7 +188,7 @@ void save_rasterfile( char *name, int width, int height, unsigned char *p) {
  * to a color in the palette. 
  */
 
-__device__ unsigned char xy2color(double a, double b, int prof) {
+__device__ unsigned char xy2color(double a, double b, int prof, int *n_steps) {
   double x, y, temp, x2, y2;
   int i;
 
@@ -203,11 +203,13 @@ __device__ unsigned char xy2color(double a, double b, int prof) {
     y = 2*temp*y + b;
     if( x2 + y2 > 4.0) break;
   }
+
+  *n_steps = i;
   return (i==prof)?255:(int)((i%255)); 
 }
 
 
-__global__ void mandelbrotKernel(unsigned char *d_ima, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
+__global__ void mandelbrotKernel(unsigned char *d_ima, unsigned int *d_steps, int w, int h, int prof, double xmin, double ymin, double xmax, double ymax) {
   double xinc = (xmax - xmin) / (w-1);
   double yinc = (ymax - ymin) / (h-1);
 
@@ -219,7 +221,10 @@ __global__ void mandelbrotKernel(unsigned char *d_ima, int w, int h, int prof, d
   double x = xmin + col * xinc;
   double y = ymax - row * yinc;
 
-  d_ima[col+row*w] = xy2color(x, y, prof);
+  int n_steps = 0;
+  d_ima[col+row*w] = xy2color(x, y, prof, &n_steps);
+
+  d_steps[col+row*w] = n_steps;
 }
 
 
@@ -289,14 +294,32 @@ int main(int argc, char *argv[]) {
   unsigned char *d_ima;
   cudaMalloc(&d_ima, w*h*sizeof(unsigned char));
 
-  mandelbrotKernel<<<gridSize, threadsPerBlock>>>(d_ima, w, h, prof, xmin, ymin, xmax, ymax);
+  int *steps = (int *)malloc( w*h*sizeof(int));
+  int *d_steps;
+  cudaMalloc(&d_steps, w*h*sizeof(int));
+
+  mandelbrotKernel<<<gridSize, threadsPerBlock>>>(d_ima, d_steps, w, h, prof, xmin, ymin, xmax, ymax);
   cudaMemcpy(ima, d_ima, w*h*sizeof(unsigned char), cudaMemcpyDeviceToHost);
   cudaFree(d_ima);
+
+  cudaMemcpy(steps, d_steps, w*h*sizeof(int), cudaMemcpyDeviceToHost);
+  cudaFree(d_steps);
+
+  long long sum = 0;
+  for (int i = 0; i < w * h; i++) {
+      sum += steps[i];
+  }
+
+  double average = sum / (w * h);
+  printf("Average iteration count: %.2f\n", average);
+  free(steps);
   
   /* Timing stop */
   fin = my_gettimeofday();
   fprintf( stderr, "Total computation time: %g sec\n", fin - debut);
   fprintf( stdout, "%g\n", fin - debut);
+
+  for (i)
 
   /* Saving the grid in the "mandel.ras" result file */
   save_rasterfile( "mandel.ras", w, h, ima);
