@@ -189,7 +189,7 @@ void save_rasterfile( char *name, int width, int height, unsigned char *p) {
  * to a color in the palette. 
  */
 
-unsigned char xy2color(double a, double b, int prof) {
+unsigned char xy2color(double a, double b, int prof, int *n_steps) {
   double x, y, temp, x2, y2;
   int i;
 
@@ -204,11 +204,13 @@ unsigned char xy2color(double a, double b, int prof) {
     y = 2*temp*y + b;
     if( x2 + y2 > 4.0) break;
   }
+
+  *n_steps = i;
   return (i==prof)?255:(int)((i%255)); 
 }
 
 // Generate k-th row of the Mandelbrot image
-void generate_row(int k, int w, double xmin, double ymin, double xinc, double yinc, int prof, unsigned char *row) {
+void generate_row(int k, int w, double xmin, double ymin, double xinc, double yinc, int prof, unsigned char *row, int *n_iterations) {
     double x, y;
 
     // Compute the y-coordinate of the k-th row
@@ -216,7 +218,10 @@ void generate_row(int k, int w, double xmin, double ymin, double xinc, double yi
 
     for (int j = 0; j < w; j++) {
         x = xmin + j * xinc;
-        row[j] = xy2color(x, y, prof);
+
+        int pixel_iterations = 0;
+        row[j] = xy2color(x, y, prof, &pixel_iterations);
+        &n_iterations += pixel_iterations;
     }
 }
 
@@ -307,7 +312,7 @@ int main(int argc, char *argv[]) {
     while (running_procceses > 0) {
       
       // MPI_probe
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,  &status);
+      MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,  &status);
       int sender = status.MPI_SOURCE;
       int receiving_row = worker_row[sender];
 
@@ -332,12 +337,30 @@ int main(int argc, char *argv[]) {
     // Save output image
     save_rasterfile( "mandel.ras", w, h, mandel);
     free(mandel);
+    
+    long long *pixel_iterations = malloc((p-1) * sizeof(long long))
+    for (int i = 0; i < p-1; i++) {
+      MPI_Probe(MPI_ANY_SOURCE, 1, MPI_COMM_WORLD,  &status);
+      int sender = status.MPI_SOURCE;
 
+      MPI_Recv(&pixel_iterations[sender], 1, MPI_LONG_LONG, sender, 1, MPI_COMM_WORLD, &status);
+    }
+
+    long long sum = 0;
+    for (int i = 0; i < p-1; i++) {
+        sum += pixel_iterations[i];
+    }
+    double average = sum / (w * h);
+    
+    printf("Average iteration count: %.2f\n", average);
+    free(pixel_iterations);
   } else {
     // Workers
 
     // Row worker is calculating
     unsigned char *row = malloc( w*sizeof(unsigned char));
+
+    long long total_pixel_iterations = 0;
 
     if (row == NULL) {
         fprintf(stderr, "Memory allocation error \n");
@@ -356,13 +379,16 @@ int main(int argc, char *argv[]) {
       }
 
       // Else generate the row
-      generate_row(row_index, w, xmin, ymin, xinc, yinc, prof, row);
+      int n_iterations = 0;
+      generate_row(row_index, w, xmin, ymin, xinc, yinc, prof, row, &n_iterations);
+      total_pixel_iterations += n_iterations;
 
       // Send computed row to master
       MPI_Send(row, w, MPI_UNSIGNED_CHAR, p-1, 0, MPI_COMM_WORLD);
-    }    
-    
+    }
     free(row);
+
+    MPI_Send(&total_pixel_iterations, 1, MPI_LONG_LONG, p-1, 1, MPI_COMM_WORLD);
   }
   
   /* Timing stop */
