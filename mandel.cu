@@ -298,6 +298,7 @@ int main(int argc, char *argv[]) {
   unsigned char	*ima;
   /* Timing: */
   double debut, fin;
+  int block_x, block_y;
 
   /* Timing start */
   debut = my_gettimeofday();
@@ -310,6 +311,7 @@ int main(int argc, char *argv[]) {
   xmax =  2; ymax =  2;
   w = h = 800;
   prof = 10000;
+  block_x = 16; block_y = 16;
   
   /* Get command line parameters */
   if( argc > 1) w    = atoi(argv[1]);
@@ -319,6 +321,9 @@ int main(int argc, char *argv[]) {
   if( argc > 5) xmax = atof(argv[5]);
   if( argc > 6) ymax = atof(argv[6]);
   if( argc > 7) prof = atoi(argv[7]);
+  if( argc > 8) block_x = atoi(argv[8]);
+  if( argc > 9) block_y = atoi(argv[9]);
+
   
   xinc = (xmax - xmin) / (w-1);
   yinc = (ymax - ymin) / (h-1);
@@ -337,11 +342,10 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  // Block = 16 x 16 threads
-  int n_blocks_x = (int)ceil((double)w / 16);
-  int n_blocks_y = (int)ceil((double)h / 16);
+  int n_blocks_x = (int)ceil((double)w / block_x);
+  int n_blocks_y = (int)ceil((double)h / block_y);
 
-  dim3 threadsPerBlock(16, 16);
+  dim3 threadsPerBlock(block_x, block_y);
   dim3 gridSize(n_blocks_x, n_blocks_y);
 
   unsigned char *d_ima;
